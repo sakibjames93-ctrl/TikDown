@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { Download, Search, CheckCircle2, AlertCircle, Loader2, Music, Image as ImageIcon, Video, Star, Clock, Trash2, Copy, Check, User, Grid, Clipboard, Share2, Link } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, Search, CheckCircle2, AlertCircle, Loader2, Music, Image as ImageIcon, Video, Star, Clock, Trash2, Copy, Check, User, Grid, Clipboard, Share2, Link, Crown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TikTokVideoData } from '../types';
 import JSZip from 'jszip';
-import { doc, setDoc, increment, collection } from 'firebase/firestore';
+import { doc, setDoc, increment, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const trackDownload = async () => {
   try {
@@ -30,6 +32,38 @@ const formatCount = (num: number | undefined | null) => {
 };
 
 export function Home() {
+  const { user, isPremium } = useAuth();
+  const navigate = useNavigate();
+  const [limitReached, setLimitReached] = useState(false);
+
+  const getDailyUsage = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const saved = localStorage.getItem('tikdown_daily_usage');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.date === today) {
+        return parsed.count;
+      }
+    }
+    return 0;
+  };
+
+  const incrementDailyUsage = () => {
+    if (isPremium) return;
+    const today = new Date().toISOString().split('T')[0];
+    const count = getDailyUsage();
+    localStorage.setItem('tikdown_daily_usage', JSON.stringify({ date: today, count: count + 1 }));
+  };
+
+  const checkLimit = () => {
+    if (isPremium) return true;
+    if (getDailyUsage() >= 3) {
+      setLimitReached(true);
+      return false;
+    }
+    return true;
+  };
+
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -327,6 +361,10 @@ export function Home() {
   };
 
   const handleBulkDownloadSelected = async () => {
+    if (!isPremium) {
+      setLimitReached(true);
+      return;
+    }
     if (selectedVideos.length === 0 || bulkDownloading) return;
     setBulkDownloading(true);
     setBulkProgress(0);
@@ -408,6 +446,10 @@ export function Home() {
   };
 
   const handleDownloadAllProfileVideosAsZip = async () => {
+    if (!isPremium) {
+      setLimitReached(true);
+      return;
+    }
     if (!profileQuery.trim() || profileLoading || bulkDownloading || isDownloadingAllAsZip) return;
     
     setIsDownloadingAllAsZip(true);
@@ -558,6 +600,10 @@ export function Home() {
       return;
     }
 
+    if (!checkLimit()) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setVideoData(null);
@@ -602,6 +648,7 @@ export function Home() {
 
       setVideoData(data);
       trackDownload();
+      incrementDailyUsage();
 
       // Save to processed list for persistent preview placeholder gallery
       setProcessedVideos((prev) => {
@@ -927,6 +974,26 @@ export function Home() {
         >
           <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
           <p className="text-sm font-medium">{error}</p>
+        </motion.div>
+      )}
+
+      {/* Limit Reached Message */}
+      {limitReached && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mt-6 max-w-2xl mx-auto bg-pink-900/20 backdrop-blur-md text-pink-400 px-4 py-3 rounded-xl border border-pink-500/30 flex items-center gap-3 justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <Crown className="w-5 h-5 shrink-0 text-pink-400" />
+            <p className="text-sm font-medium">Daily limit reached (3/3 free downloads). Upgrade to Premium for unlimited downloads!</p>
+          </div>
+          <button 
+            onClick={() => navigate('/pricing')}
+            className="px-4 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-lg text-xs font-bold transition-colors"
+          >
+            Upgrade
+          </button>
         </motion.div>
       )}
 

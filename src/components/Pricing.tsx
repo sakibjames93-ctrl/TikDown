@@ -13,10 +13,14 @@ export function Pricing() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showCryptoModal, setShowCryptoModal] = useState(false);
+  const [showBkashModal, setShowBkashModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [bkashNumber, setBkashNumber] = useState('');
+  const [trxId, setTrxId] = useState('');
 
   const cryptoAddress = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh";
   const cryptoAmount = "0.00015"; // roughly $4.99
+  const bkashAmount = "500"; // BDT
 
   const handleCryptoPaymentClick = () => {
     if (!user) {
@@ -24,6 +28,14 @@ export function Pricing() {
       return;
     }
     setShowCryptoModal(true);
+  };
+
+  const handleBkashPaymentClick = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setShowBkashModal(true);
   };
 
   const copyToClipboard = () => {
@@ -41,6 +53,21 @@ export function Pricing() {
       setSuccess(true);
       setLoading(false);
     }, 2500);
+  };
+
+  const handleVerifyBkashPayment = async () => {
+    if (!bkashNumber || !trxId) {
+      alert("Please enter bKash number and TrxID");
+      return;
+    }
+    setLoading(true);
+    // Simulate bKash / SSLCommerz Verification
+    setTimeout(async () => {
+      await updateDoc(doc(db, 'users', user!.uid), { isPremium: true });
+      setShowBkashModal(false);
+      setSuccess(true);
+      setLoading(false);
+    }, 2000);
   };
 
   const handlePayPalSuccess = async (details: any) => {
@@ -151,6 +178,13 @@ export function Pricing() {
                   <Bitcoin className="w-5 h-5" />
                   Pay with Crypto
                 </button>
+
+                <button 
+                  onClick={handleBkashPaymentClick}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl font-medium hover:from-pink-600 hover:to-rose-600 transition-colors"
+                >
+                  Pay with bKash / SSLCommerz
+                </button>
               </>
             ) : (
               <button 
@@ -223,6 +257,76 @@ export function Pricing() {
               </button>
               <p className="text-xs text-center text-gray-500">
                 It may take a few minutes for the transaction to be confirmed on the blockchain.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBkashModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 relative overflow-hidden shadow-2xl">
+            <button 
+              onClick={() => setShowBkashModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="text-center mb-6">
+              <div className="mx-auto w-12 h-12 bg-pink-50 text-pink-600 rounded-full flex items-center justify-center mb-4">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900">Pay with bKash / SSLCommerz</h3>
+              <p className="text-sm text-gray-500 mt-2">Send <strong className="text-gray-900">{bkashAmount} BDT</strong> to the agent number below, then enter your details.</p>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-2xl flex flex-col items-center justify-center mb-6 border border-gray-100 space-y-4">
+              <div className="w-full text-center mb-2">
+                <p className="text-sm text-gray-500">Agent Number (Send Money / Payment)</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">01700-000000</p>
+              </div>
+              
+              <div className="w-full space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Your Account Number</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 017xxxxxxxx"
+                    value={bkashNumber}
+                    onChange={(e) => setBkashNumber(e.target.value)}
+                    className="w-full mt-1 bg-white border border-gray-200 text-sm py-2.5 px-3 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Transaction ID (TrxID)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 8G3HD9B2"
+                    value={trxId}
+                    onChange={(e) => setTrxId(e.target.value)}
+                    className="w-full mt-1 bg-white border border-gray-200 text-sm py-2.5 px-3 rounded-lg focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button 
+                onClick={handleVerifyBkashPayment}
+                disabled={loading}
+                className="w-full bg-pink-600 text-white py-3.5 rounded-xl font-medium hover:bg-pink-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Verifying Payment...
+                  </>
+                ) : (
+                  'Verify Payment'
+                )}
+              </button>
+              <p className="text-xs text-center text-gray-500">
+                Automatic verification may take a few seconds after confirming.
               </p>
             </div>
           </div>
