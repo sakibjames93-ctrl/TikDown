@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "Settings": {
+      "title": "Website Settings",
+      "description": "Global settings for the website",
+      "type": "object",
+      "properties": {
+        "websiteName": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "apiBaseUrl": { "type": "string" },
+        "adsCodeHead": { "type": "string" },
+        "adsCodeBody": { "type": "string" },
+        "seoTitle": { "type": "string" },
+        "seoDescription": { "type": "string" }
+      }
+    },
+    "Stats": {
+      "title": "Download Stats",
+      "description": "Download statistics counter",
+      "type": "object",
+      "properties": {
+        "totalDownloads": { "type": "number" },
+        "date": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Global settings"
+    },
+    "/stats/{dateId}": {
+      "schema": "Stats",
+      "description": "Daily download stats"
+    }
+  }
+}

@@ -1,6 +1,10 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
 
 function formatTikwmUrls(obj: any) {
   if (!obj) return;
@@ -23,9 +27,37 @@ function formatTikwmUrls(obj: any) {
 
 async function startServer() {
   const app = express();
+  // On Hostinger, you must change this line to: const PORT = process.env.PORT || 3000;
+  // (AI Studio requires port 3000 to be hardcoded during development)
   const PORT = 3000;
 
+  // Security Middleware
+  app.use(helmet({
+    contentSecurityPolicy: false, // Allow Vite inline scripts and external images
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // CORS Configuration
+  app.use(cors({
+    origin: process.env.NODE_ENV === "production" ? "*" : "*", // Allow all for now, can be restricted to specific domains later
+    methods: ["GET", "POST", "OPTIONS"],
+  }));
+
+  // Basic Logging
+  app.use(morgan("dev"));
+
   app.use(express.json());
+
+  // Rate Limiting for API routes to prevent abuse
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests from this IP, please try again after 15 minutes." }
+  });
+
+  app.use("/api/", apiLimiter);
 
   // TikWM API Proxy
   app.get("/api/video", async (req, res) => {
@@ -33,6 +65,10 @@ async function startServer() {
       const videoUrl = req.query.url as string;
       if (!videoUrl) {
         return res.status(400).json({ error: "TikTok URL is required" });
+      }
+      
+      if (videoUrl.length > 500) {
+        return res.status(400).json({ error: "URL is too long" });
       }
 
       let targetUrl = videoUrl.trim();
@@ -106,6 +142,10 @@ async function startServer() {
       let rawQuery = req.query.username as string;
       if (!rawQuery) {
         return res.status(400).json({ error: "Username or profile URL is required" });
+      }
+
+      if (rawQuery.length > 500) {
+        return res.status(400).json({ error: "Input is too long" });
       }
 
       let targetUrl = rawQuery.trim();
@@ -219,6 +259,10 @@ async function startServer() {
       if (!fileUrl) {
         return res.status(400).json({ error: "File URL is required" });
       }
+
+      if (fileUrl.length > 2000) {
+        return res.status(400).json({ error: "File URL is too long" });
+      }
       
       fileUrl = fileUrl.trim();
 
@@ -250,13 +294,14 @@ async function startServer() {
 
       const body = response.body;
       if (body) {
-        const reader = body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
-        }
-        res.end();
+        const { Readable } = await import('stream');
+        const readable = Readable.fromWeb(body as any);
+        readable.on('error', (err) => {
+          console.error("Stream error:", err);
+          if (!res.headersSent) res.status(500).end();
+          else res.end();
+        });
+        readable.pipe(res);
       } else {
         res.status(500).json({ error: "Stream unavailable" });
       }
@@ -284,6 +329,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+  
+  // Global error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Unhandled error:", err);
+    res.status(500).json({ error: "Something went wrong! We're looking into it." });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

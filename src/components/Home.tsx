@@ -1,8 +1,22 @@
 import React, { useState } from 'react';
-import { Download, Search, CheckCircle2, AlertCircle, Loader2, Music, Image as ImageIcon, Video, Star, Clock, Trash2, Copy, Check, User, Grid, Clipboard } from 'lucide-react';
+import { Download, Search, CheckCircle2, AlertCircle, Loader2, Music, Image as ImageIcon, Video, Star, Clock, Trash2, Copy, Check, User, Grid, Clipboard, Share2, Link } from 'lucide-react';
 import { motion } from 'motion/react';
 import { TikTokVideoData } from '../types';
 import JSZip from 'jszip';
+import { doc, setDoc, increment, collection } from 'firebase/firestore';
+import { db } from '../firebase';
+
+const trackDownload = async () => {
+  try {
+    const date = new Date().toISOString().split('T')[0];
+    await setDoc(doc(db, 'stats', date), {
+      date: date,
+      totalDownloads: increment(1)
+    }, { merge: true });
+  } catch (err) {
+    console.error("Failed to track download stat:", err);
+  }
+};
 
 const formatCount = (num: number | undefined | null) => {
   if (num === undefined || num === null) return "0";
@@ -145,7 +159,7 @@ export function Home() {
         }
       }
     } catch (err: any) {
-      setProfileError(err.message || 'Something went wrong while fetching the profile.');
+      setProfileError(err.message || 'We couldn\'t find that profile. Please make sure the username is correct.');
     } finally {
       setProfileLoading(false);
     }
@@ -206,7 +220,7 @@ export function Home() {
         }
       }
     } catch (err: any) {
-      setProfileError(err.message || 'Something went wrong while fetching more profile videos.');
+      setProfileError(err.message || 'We hit a snag loading more videos. Please try again.');
     } finally {
       setProfileLoading(false);
       setLoadingTargetCount(null);
@@ -270,6 +284,7 @@ export function Home() {
           }
           setDownloadStatus(prev => ({ ...prev, [videoId]: 'completed' }));
           setDownloadProgress(prev => ({ ...prev, [videoId]: 100 }));
+          trackDownload();
           return blob;
         }
 
@@ -296,6 +311,7 @@ export function Home() {
         }
         setDownloadStatus(prev => ({ ...prev, [videoId]: 'completed' }));
         setDownloadProgress(prev => ({ ...prev, [videoId]: 100 }));
+        trackDownload();
         return combinedBlob; // download succeeded
       } catch (err: any) {
         const errMsg = err.message || err.toString();
@@ -538,7 +554,7 @@ export function Home() {
     if (!targetUrl.trim()) return;
 
     if (!targetUrl.includes('tiktok.com')) {
-      setError('Please enter a valid TikTok URL.');
+      setError('Oops! That doesn\'t look like a valid TikTok link. Please check and try again.');
       return;
     }
 
@@ -577,7 +593,7 @@ export function Home() {
             throw new Error('No videos found for this creator or profile is private.');
           }
         } catch (err: any) {
-          setProfileError(err.message || 'Something went wrong while fetching the profile.');
+          setProfileError(err.message || 'We couldn\'t find that profile. Please make sure the username is correct.');
         } finally {
           setProfileLoading(false);
         }
@@ -585,6 +601,7 @@ export function Home() {
       }
 
       setVideoData(data);
+      trackDownload();
 
       // Save to processed list for persistent preview placeholder gallery
       setProcessedVideos((prev) => {
@@ -601,37 +618,61 @@ export function Home() {
         return updated;
       });
     } catch (err: any) {
-      setError(err.message || 'Something went wrong while fetching the video.');
+      setError(err.message || 'We couldn\'t fetch that video. It might be private or deleted.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-12 px-4 sm:px-6">
+    <div className="w-full max-w-4xl mx-auto py-12 px-4 sm:px-6 relative z-10">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight sm:text-5xl mb-4">
-          Download TikTok Videos <span className="text-pink-500">Instantly</span>
-        </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Free, fast, and watermark-free TikTok video downloader. Paste your link below to get started. No account required.
-        </p>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-block mb-4 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 backdrop-blur-md"
+        >
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-cyan-400 font-semibold text-sm tracking-wide flex items-center gap-2">
+            <Star className="w-4 h-4 text-pink-400" /> Premium TikTok Downloader
+          </span>
+        </motion.div>
+        <motion.h1 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="text-4xl font-extrabold text-white tracking-tight sm:text-6xl mb-6 leading-tight drop-shadow-lg"
+        >
+          Download Videos <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-cyan-400">Without Watermark</span>
+        </motion.h1>
+        <motion.p 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-lg text-gray-300 max-w-2xl mx-auto font-light"
+        >
+          Fast, free, and in ultra-high quality. Paste your link below to get started instantly. No account required.
+        </motion.p>
       </div>
 
       {/* Mode Switcher */}
-      <div className="flex justify-center mb-8">
-        <div className="bg-white p-1 rounded-2xl border border-gray-100 shadow-sm flex gap-1">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.3 }}
+        className="flex justify-center mb-8"
+      >
+        <div className="bg-slate-800/60 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/50 shadow-xl flex gap-1">
           <button
             type="button"
             onClick={() => {
               setMode('single');
               setError(null);
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               mode === 'single'
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/10'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-gradient-to-r from-pink-500 to-cyan-500 text-white shadow-lg shadow-pink-500/25'
+                : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
             <Video className="w-4 h-4" />
@@ -643,17 +684,17 @@ export function Home() {
               setMode('profile');
               setProfileError(null);
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
               mode === 'profile'
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md shadow-pink-500/10'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-gradient-to-r from-pink-500 to-cyan-500 text-white shadow-lg shadow-pink-500/25'
+                : 'text-gray-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Profile Bulk</span>
+            <span>Bulk Profile</span>
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Input Box */}
       {mode === 'single' ? (
@@ -661,7 +702,8 @@ export function Home() {
           onSubmit={fetchVideo}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative max-w-2xl mx-auto bg-white p-2 rounded-2xl shadow-lg border border-gray-100 flex flex-col sm:flex-row shadow-pink-500/5 hover:border-pink-200 transition-colors"
+          transition={{ delay: 0.4 }}
+          className="relative max-w-2xl mx-auto bg-slate-800/60 backdrop-blur-xl p-2.5 rounded-[1.25rem] shadow-2xl border border-slate-700/50 flex flex-col sm:flex-row shadow-pink-500/5 hover:border-pink-500/30 hover:shadow-pink-500/10 transition-all duration-300"
         >
           <div className="relative flex-grow">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
@@ -673,7 +715,7 @@ export function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Paste TikTok video link here..."
-              className="block w-full pl-12 pr-24 py-4 text-gray-900 placeholder-gray-400 focus:outline-none rounded-xl text-lg bg-transparent"
+              className="block w-full pl-12 pr-24 py-4 text-white placeholder-gray-400 focus:outline-none rounded-xl text-lg bg-transparent"
               required
             />
             <div className="absolute inset-y-0 right-3 flex items-center">
@@ -681,9 +723,9 @@ export function Home() {
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="absolute bottom-full right-0 mb-3 z-30 w-64 bg-slate-900 text-white text-xs rounded-xl p-3.5 shadow-xl border border-slate-800 text-left leading-relaxed"
+                  className="absolute bottom-full right-0 mb-3 z-30 w-64 bg-slate-900 text-white text-xs rounded-xl p-3.5 shadow-xl border border-slate-700 text-left leading-relaxed"
                 >
-                  <div className="absolute top-full right-8 -mt-1.5 w-2.5 h-2.5 bg-slate-900 rotate-45 border-r border-b border-slate-800"></div>
+                  <div className="absolute top-full right-8 -mt-1.5 w-2.5 h-2.5 bg-slate-900 rotate-45 border-r border-b border-slate-700"></div>
                   <p className="font-semibold flex items-center gap-1.5 mb-1 text-pink-400">
                     <Clipboard className="w-3.5 h-3.5" /> Direct Paste Restricted
                   </p>
@@ -695,7 +737,7 @@ export function Home() {
               <button
                 type="button"
                 onClick={() => handlePaste('single')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-pink-50 text-gray-500 hover:text-pink-600 rounded-xl text-xs font-semibold border border-gray-100 hover:border-pink-200 transition-all duration-200 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 text-gray-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-600/50 hover:border-slate-500 transition-all duration-200 cursor-pointer"
                 title="Paste link from clipboard"
               >
                 <Clipboard className="w-3.5 h-3.5" />
@@ -706,9 +748,9 @@ export function Home() {
           <button
             type="submit"
             disabled={isLoading || !url}
-            className="mt-2 sm:mt-0 sm:ml-2 w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-semibold rounded-xl hover:opacity-90 focus:ring-4 focus:ring-pink-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-md flex justify-center items-center h-full cursor-pointer"
+            className="mt-2 sm:mt-0 sm:ml-2 w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-400 hover:to-cyan-400 text-white font-bold rounded-[1rem] shadow-lg shadow-pink-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center h-full cursor-pointer text-lg"
           >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Download'}
+            {isLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Download'}
           </button>
         </motion.form>
       ) : (
@@ -719,7 +761,8 @@ export function Home() {
           }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative max-w-2xl mx-auto bg-white p-2 rounded-2xl shadow-lg border border-gray-100 flex flex-col sm:flex-row shadow-pink-500/5 hover:border-pink-200 transition-colors"
+          transition={{ delay: 0.4 }}
+          className="relative max-w-2xl mx-auto bg-slate-800/60 backdrop-blur-xl p-2.5 rounded-[1.25rem] shadow-2xl border border-slate-700/50 flex flex-col sm:flex-row shadow-pink-500/5 hover:border-pink-500/30 hover:shadow-pink-500/10 transition-all duration-300"
         >
           <div className="relative flex-grow">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
@@ -731,7 +774,7 @@ export function Home() {
               value={profileQuery}
               onChange={(e) => setProfileQuery(e.target.value)}
               placeholder="Paste creator profile link or enter @username..."
-              className="block w-full pl-12 pr-24 py-4 text-gray-900 placeholder-gray-400 focus:outline-none rounded-xl text-lg bg-transparent"
+              className="block w-full pl-12 pr-24 py-4 text-white placeholder-gray-400 focus:outline-none rounded-xl text-lg bg-transparent"
               required
             />
             <div className="absolute inset-y-0 right-3 flex items-center">
@@ -739,9 +782,9 @@ export function Home() {
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className="absolute bottom-full right-0 mb-3 z-30 w-64 bg-slate-900 text-white text-xs rounded-xl p-3.5 shadow-xl border border-slate-800 text-left leading-relaxed"
+                  className="absolute bottom-full right-0 mb-3 z-30 w-64 bg-slate-900 text-white text-xs rounded-xl p-3.5 shadow-xl border border-slate-700 text-left leading-relaxed"
                 >
-                  <div className="absolute top-full right-8 -mt-1.5 w-2.5 h-2.5 bg-slate-900 rotate-45 border-r border-b border-slate-800"></div>
+                  <div className="absolute top-full right-8 -mt-1.5 w-2.5 h-2.5 bg-slate-900 rotate-45 border-r border-b border-slate-700"></div>
                   <p className="font-semibold flex items-center gap-1.5 mb-1 text-pink-400">
                     <Clipboard className="w-3.5 h-3.5" /> Direct Paste Restricted
                   </p>
@@ -753,7 +796,7 @@ export function Home() {
               <button
                 type="button"
                 onClick={() => handlePaste('profile')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-pink-50 text-gray-500 hover:text-pink-600 rounded-xl text-xs font-semibold border border-gray-100 hover:border-pink-200 transition-all duration-200 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 text-gray-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-600/50 hover:border-slate-500 transition-all duration-200 cursor-pointer"
                 title="Paste from clipboard"
               >
                 <Clipboard className="w-3.5 h-3.5" />
@@ -764,9 +807,9 @@ export function Home() {
           <button
             type="submit"
             disabled={profileLoading || !profileQuery}
-            className="mt-2 sm:mt-0 sm:ml-2 w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-semibold rounded-xl hover:opacity-90 focus:ring-4 focus:ring-pink-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-md flex justify-center items-center h-full cursor-pointer min-w-[150px]"
+            className="mt-2 sm:mt-0 sm:ml-2 w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-400 hover:to-cyan-400 text-white font-bold rounded-[1rem] shadow-lg shadow-pink-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center h-full cursor-pointer min-w-[150px] text-lg"
           >
-            {profileLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Search Profile'}
+            {profileLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Search Profile'}
           </button>
         </motion.form>
       )}
@@ -779,8 +822,8 @@ export function Home() {
           className="mt-6 max-w-2xl mx-auto"
         >
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-gray-400 animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-slate-400 animate-pulse" />
               Recent Downloads
             </span>
             <button 
@@ -789,7 +832,7 @@ export function Home() {
                 setRecentSearches([]);
                 localStorage.removeItem('recent_tiktok_searches');
               }}
-              className="text-xs font-medium text-gray-400 hover:text-red-500 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-medium text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" /> Clear History
             </button>
@@ -819,7 +862,7 @@ export function Home() {
               return (
                 <div
                   key={idx}
-                  className="flex items-center bg-white rounded-full border border-gray-100 hover:border-pink-200 transition-colors shadow-sm hover:shadow-md overflow-hidden"
+                  className="flex items-center bg-slate-800/60 backdrop-blur-md rounded-full border border-slate-700/50 hover:border-pink-500/50 transition-colors shadow-sm hover:shadow-md overflow-hidden"
                 >
                   <button
                     type="button"
@@ -828,12 +871,12 @@ export function Home() {
                       fetchVideo(undefined, searchUrl);
                     }}
                     title={`Revisit search: ${searchUrl}`}
-                    className="flex items-center gap-2 pl-3.5 pr-2 py-1.5 text-gray-600 hover:text-pink-600 text-xs font-medium cursor-pointer transition-colors"
+                    className="flex items-center gap-2 pl-3.5 pr-2 py-1.5 text-gray-300 hover:text-white text-xs font-medium cursor-pointer transition-colors"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0 shadow-[0_0_8px_rgba(236,72,153,0.8)]"></span>
                     <span className="truncate max-w-[150px]">{label}</span>
                   </button>
-                  <div className="w-px h-3.5 bg-gray-100"></div>
+                  <div className="w-px h-3.5 bg-slate-700"></div>
                   <button
                     type="button"
                     onClick={async (e) => {
@@ -860,10 +903,10 @@ export function Home() {
                       }
                     }}
                     title="Copy TikTok link"
-                    className="pl-2 pr-3.5 py-1.5 text-gray-400 hover:text-pink-500 transition-colors flex items-center justify-center cursor-pointer"
+                    className="pl-2 pr-3.5 py-1.5 text-gray-400 hover:text-pink-400 transition-colors flex items-center justify-center cursor-pointer"
                   >
                     {isCopied ? (
-                      <Check className="w-3.5 h-3.5 text-green-500" />
+                      <Check className="w-3.5 h-3.5 text-green-400" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -880,9 +923,9 @@ export function Home() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="mt-6 max-w-2xl mx-auto bg-red-50 text-red-600 px-4 py-3 rounded-xl border border-red-100 flex items-center gap-3"
+          className="mt-6 max-w-2xl mx-auto bg-red-900/20 backdrop-blur-md text-red-400 px-4 py-3 rounded-xl border border-red-500/30 flex items-center gap-3"
         >
-          <AlertCircle className="w-5 h-5 shrink-0" />
+          <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
           <p className="text-sm font-medium">{error}</p>
         </motion.div>
       )}
@@ -892,9 +935,9 @@ export function Home() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="mt-6 max-w-2xl mx-auto bg-red-50 text-red-600 px-4 py-3 rounded-xl border border-red-100 flex items-center gap-3"
+          className="mt-6 max-w-2xl mx-auto bg-red-900/20 backdrop-blur-md text-red-400 px-4 py-3 rounded-xl border border-red-500/30 flex items-center gap-3"
         >
-          <AlertCircle className="w-5 h-5 shrink-0" />
+          <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
           <p className="text-sm font-medium">{profileError}</p>
         </motion.div>
       )}
@@ -904,52 +947,54 @@ export function Home() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-12 bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden p-6 md:p-8 max-w-4xl mx-auto text-left"
+          className="mt-12 bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl overflow-hidden p-6 md:p-8 max-w-4xl mx-auto text-left"
         >
           {/* Creator Profile Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start gap-6 pb-6 border-b border-gray-100 mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-6 pb-6 border-b border-slate-700/50 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <img 
                 src={profileUser?.avatarLarger || profileVideos[0].author.avatar} 
                 alt={profileUser?.nickname || profileVideos[0].author.nickname} 
-                className="w-16 h-16 rounded-full border-2 border-pink-500 shadow-md object-cover shrink-0"
+                className="w-16 h-16 rounded-full border-2 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.3)] object-cover shrink-0"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
               />
               <div className="space-y-1">
-                <p className="font-bold text-xl text-gray-900 flex items-center gap-1.5">
+                <p className="font-bold text-xl text-white flex items-center gap-1.5">
                   {profileUser?.nickname || profileVideos[0].author.nickname}
                   {(profileUser?.verified || profileVideos[0].author.verified !== false) && (
-                    <CheckCircle2 className="w-5 h-5 text-pink-500 shrink-0" />
+                    <CheckCircle2 className="w-5 h-5 text-pink-400 shrink-0" />
                   )}
                 </p>
-                <p className="text-sm text-gray-500 font-semibold">@{profileUser?.uniqueId || profileVideos[0].author.unique_id}</p>
+                <p className="text-sm text-slate-400 font-semibold">@{profileUser?.uniqueId || profileVideos[0].author.unique_id}</p>
                 {profileUser?.signature && (
-                  <p className="text-xs text-gray-400 mt-1 max-w-md line-clamp-2 italic">"{profileUser.signature}"</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-md line-clamp-2 italic">"{profileUser.signature}"</p>
                 )}
               </div>
             </div>
             
             <div className="flex flex-col items-start md:items-end gap-3 shrink-0 w-full md:w-auto">
-              <div className="bg-gradient-to-r from-pink-50 to-cyan-50 text-transparent bg-clip-text font-black text-xs px-3 py-1.5 rounded-full border border-pink-100 uppercase tracking-wider self-start md:self-auto flex items-center gap-1.5">
-                <span className="text-pink-500">👤</span> <span className="text-pink-600">TikTok Creator Profile</span>
+              <div className="bg-gradient-to-r from-pink-500/10 to-cyan-500/10 text-transparent bg-clip-text font-black text-xs px-3 py-1.5 rounded-full border border-pink-500/20 uppercase tracking-wider self-start md:self-auto flex items-center gap-1.5">
+                <span className="text-pink-400">👤</span> <span className="text-pink-400 bg-clip-text">TikTok Creator Profile</span>
               </div>
               
               {/* Profile Statistics Block */}
               {profileStats && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1 w-full md:w-auto">
                   <div className="flex flex-col text-left md:text-right min-w-[70px]">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Videos</span>
-                    <span className="text-sm font-extrabold text-pink-500">{formatCount(profileStats.videoCount)}</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Videos</span>
+                    <span className="text-sm font-extrabold text-pink-400">{formatCount(profileStats.videoCount)}</span>
                   </div>
-                  <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
+                  <div className="w-px h-6 bg-slate-700 hidden sm:block"></div>
                   <div className="flex flex-col text-left md:text-right min-w-[70px]">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Followers</span>
-                    <span className="text-sm font-extrabold text-gray-900">{formatCount(profileStats.followerCount)}</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Followers</span>
+                    <span className="text-sm font-extrabold text-white">{formatCount(profileStats.followerCount)}</span>
                   </div>
-                  <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
+                  <div className="w-px h-6 bg-slate-700 hidden sm:block"></div>
                   <div className="flex flex-col text-left md:text-right min-w-[70px]">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Likes</span>
-                    <span className="text-sm font-extrabold text-gray-900">{formatCount(profileStats.heartCount)}</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Likes</span>
+                    <span className="text-sm font-extrabold text-white">{formatCount(profileStats.heartCount)}</span>
                   </div>
                 </div>
               )}
@@ -957,7 +1002,7 @@ export function Home() {
           </div>
 
           {/* Bulk Action Controls */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100 mb-6 text-left">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-700/50 mb-6 text-left">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2.5 items-center">
                 <button
@@ -969,28 +1014,28 @@ export function Home() {
                       setSelectedVideos(profileVideos.map(v => v.id));
                     }
                   }}
-                  className="text-xs font-semibold px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-all shadow-sm cursor-pointer"
+                  className="text-xs font-semibold px-4 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-xl border border-slate-600 transition-all shadow-sm cursor-pointer"
                 >
                   {selectedVideos.length === profileVideos.length ? "Deselect All" : "Select All Videos"}
                 </button>
-                <span className="text-xs text-gray-500 font-medium">
+                <span className="text-xs text-slate-400 font-medium">
                   {selectedVideos.length} of {profileVideos.length} selected
                   {profileStats && (
-                    <span className="text-gray-400"> (Loaded {profileVideos.length} of {formatCount(profileStats.videoCount)} total videos)</span>
+                    <span className="text-slate-500"> (Loaded {profileVideos.length} of {formatCount(profileStats.videoCount)} total videos)</span>
                   )}
                 </span>
               </div>
 
               {/* Batch Download Format Selector */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Save Format:</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Save Format:</span>
                 <button
                   type="button"
                   onClick={() => setBulkDownloadMode('zip')}
                   className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
                     bulkDownloadMode === 'zip'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-xs'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-pink-500 to-cyan-500 text-white border-transparent shadow-lg shadow-pink-500/20'
+                      : 'bg-slate-800 text-gray-400 border-slate-700 hover:bg-slate-700'
                   }`}
                 >
                   📦 Packaging ZIP (Perfect for Mobile)
@@ -1000,8 +1045,8 @@ export function Home() {
                   onClick={() => setBulkDownloadMode('individual')}
                   className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
                     bulkDownloadMode === 'individual'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent shadow-xs'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      ? 'bg-gradient-to-r from-pink-500 to-cyan-500 text-white border-transparent shadow-lg shadow-pink-500/20'
+                      : 'bg-slate-800 text-gray-400 border-slate-700 hover:bg-slate-700'
                   }`}
                 >
                   📁 Separate MP4 Files
@@ -1047,7 +1092,7 @@ export function Home() {
               </div>
 
               {zipPackagingPercent !== null && (
-                <div className="bg-white/80 rounded-xl p-3 border border-pink-100 text-left mt-1">
+                <div className="bg-slate-900/60 rounded-xl p-3 border border-pink-500/20 text-left mt-1">
                   <div className="flex justify-between text-[11px] font-bold text-pink-700 mb-1">
                     <span>Zipping Progress (Packing items into single ZIP)</span>
                     <span>{zipPackagingPercent}%</span>
@@ -1184,17 +1229,19 @@ export function Home() {
               return (
                 <div 
                   key={video.id || idx}
-                  className={`group relative bg-white rounded-2xl overflow-hidden border transition-all flex flex-col ${
-                    isSelected ? "border-pink-500 ring-2 ring-pink-500/20" : "border-gray-100 hover:border-gray-200"
+                  className={`group relative bg-slate-800/80 backdrop-blur-md rounded-2xl overflow-hidden border transition-all flex flex-col ${
+                    isSelected ? "border-pink-500 shadow-lg shadow-pink-500/30 ring-2 ring-pink-500/50" : "border-slate-700 hover:border-slate-500"
                   }`}
                 >
                   {/* Aspect Box */}
-                  <div className="relative aspect-[3/4] w-full bg-gray-100 overflow-hidden">
+                  <div className="relative aspect-[3/4] w-full bg-slate-900 overflow-hidden">
                     <img 
                       src={video.cover} 
                       alt={video.title || "TikTok video"} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 animate-fade-in"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      decoding="async"
                     />
 
                     {/* Selection Checkbox Trigger Overlay */}
@@ -1212,7 +1259,7 @@ export function Home() {
 
                     {/* Live Download Queue Status Overlay */}
                     {downloadStatus[video.id] && (
-                      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center z-20 animate-fade-in text-white pointer-events-none">
+                      <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center z-20 animate-fade-in text-white pointer-events-none">
                         {downloadStatus[video.id] === 'pending' && (
                           <div className="flex flex-col items-center gap-1.5">
                             <Clock className="w-5 h-5 text-gray-400 animate-pulse" />
@@ -1223,8 +1270,8 @@ export function Home() {
                           <div className="flex flex-col items-center gap-2 w-full px-4">
                             <Loader2 className="w-6 h-6 text-pink-500 animate-spin" />
                             <span className="text-[10px] font-bold uppercase tracking-wider text-pink-400">Downloading</span>
-                            <div className="w-full bg-white/20 h-1 rounded-full overflow-hidden mt-1">
-                              <div className="bg-pink-500 h-full transition-all" style={{ width: `${downloadProgress[video.id] || 0}%` }}></div>
+                            <div className="w-full bg-slate-700/50 h-1 rounded-full overflow-hidden mt-1">
+                              <div className="bg-gradient-to-r from-pink-500 to-cyan-500 h-full transition-all" style={{ width: `${downloadProgress[video.id] || 0}%` }}></div>
                             </div>
                             <span className="text-[10px] font-mono font-bold mt-0.5">{downloadProgress[video.id] || 0}%</span>
                           </div>
@@ -1237,7 +1284,7 @@ export function Home() {
                         )}
                         {downloadStatus[video.id] === 'completed' && (
                           <div className="flex flex-col items-center gap-1.5">
-                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                            <CheckCircle2 className="w-6 h-6 text-green-400 shadow-green-500/50 drop-shadow-lg" />
                             <span className="text-[10px] font-bold uppercase tracking-wider text-green-400">Done</span>
                           </div>
                         )}
@@ -1260,10 +1307,10 @@ export function Home() {
                           setSelectedVideos(prev => [...prev, video.id]);
                         }
                       }}
-                      className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-black/40 backdrop-blur-sm border border-white/20 flex items-center justify-center cursor-pointer transition-colors animate-fade-in"
+                      className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-slate-900/60 backdrop-blur-md border border-white/10 flex items-center justify-center cursor-pointer transition-colors animate-fade-in shadow-lg"
                     >
                       <div className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center transition-all ${
-                        isSelected ? "bg-pink-500 text-white" : "border-2 border-white"
+                        isSelected ? "bg-gradient-to-r from-pink-500 to-cyan-500 text-white" : "border-2 border-white/50"
                       }`}>
                         {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
@@ -1271,7 +1318,7 @@ export function Home() {
 
                     {/* Hover Overlay containing quick individual Download */}
                     {!downloadStatus[video.id] && (
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1280,9 +1327,9 @@ export function Home() {
                             const filename = `tiktok_hd_${video.id}${cleanTitle ? '_' + cleanTitle : ''}.mp4`;
                             downloadSingleVideoWithProgress(video.hdplay || video.play, filename, video.id);
                           }}
-                          className="px-4 py-2.5 bg-white text-gray-900 font-bold rounded-xl text-xs hover:bg-gray-100 transition-colors shadow-lg flex items-center gap-1.5 pointer-events-auto cursor-pointer"
+                          className="px-4 py-2.5 bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-bold rounded-xl text-xs hover:from-pink-400 hover:to-cyan-400 transition-colors shadow-lg flex items-center gap-1.5 pointer-events-auto cursor-pointer shadow-pink-500/25"
                         >
-                          <Download className="w-3.5 h-3.5 text-pink-500" />
+                          <Download className="w-3.5 h-3.5 text-white" />
                           Download Video
                         </button>
                       </div>
@@ -1290,18 +1337,18 @@ export function Home() {
 
                     {/* Duration Badge */}
                     {video.duration && (
-                      <div className="absolute bottom-2.5 right-2.5 bg-black/60 backdrop-blur-sm text-white text-[10px] font-mono font-semibold px-2 py-0.5 rounded border border-white/10">
+                      <div className="absolute bottom-2.5 right-2.5 bg-slate-900/80 backdrop-blur-sm text-white text-[10px] font-mono font-semibold px-2 py-0.5 rounded border border-white/10 shadow-lg">
                         {video.duration}s
                       </div>
                     )}
                   </div>
 
                   {/* Caption & Footer */}
-                  <div className="p-3 bg-white flex flex-col flex-grow justify-between gap-2.5 text-left">
-                    <p className="text-xs text-gray-700 font-medium line-clamp-2 leading-relaxed">
+                  <div className="p-3 bg-slate-800/80 flex flex-col flex-grow justify-between gap-2.5 text-left">
+                    <p className="text-xs text-slate-300 font-medium line-clamp-2 leading-relaxed">
                       {video.title || "No description"}
                     </p>
-                    <div className="flex items-center justify-between border-t border-gray-50 pt-2 mt-auto">
+                    <div className="flex items-center justify-between border-t border-slate-700/50 pt-2 mt-auto">
                       <span className="text-[10px] font-mono text-gray-400">
                         {video.create_time ? new Date(video.create_time * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ""}
                       </span>
@@ -1328,13 +1375,13 @@ export function Home() {
           {profileHasMore && (
             <div className="flex flex-col items-center gap-4 mt-12 border-t border-gray-100 pt-8 w-full px-4">
               {loadingTargetCount && (
-                <div className="w-full max-w-md bg-pink-50 rounded-2xl p-4 border border-pink-100 text-center animate-pulse">
-                  <div className="flex items-center justify-center gap-2 text-pink-700 font-semibold mb-2 text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin text-pink-500" />
+                <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-md rounded-2xl p-4 border border-pink-500/30 text-center animate-pulse shadow-lg shadow-pink-500/10">
+                  <div className="flex items-center justify-center gap-2 text-pink-400 font-semibold mb-2 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin text-pink-400" />
                     <span>Auto-Fetching Creator Library...</span>
                   </div>
-                  <div className="text-xs text-pink-600 font-medium">
-                    Loaded <span className="font-bold">{profileVideos.length}</span> of up to <span className="font-bold">{loadingTargetCount}</span> videos
+                  <div className="text-xs text-pink-300 font-medium">
+                    Loaded <span className="font-bold text-white">{profileVideos.length}</span> of up to <span className="font-bold text-white">{loadingTargetCount}</span> videos
                   </div>
                 </div>
               )}
@@ -1344,16 +1391,16 @@ export function Home() {
                   type="button"
                   disabled={profileLoading}
                   onClick={() => fetchProfile(true)}
-                  className="flex items-center justify-center gap-2 px-6 py-3.5 bg-gray-50 hover:bg-gray-100 hover:text-pink-600 text-gray-600 font-semibold rounded-2xl border border-gray-200 shadow-sm transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-1"
+                  className="flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-gray-300 hover:text-white font-semibold rounded-2xl border border-slate-600 shadow-sm transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-1"
                 >
                   {profileLoading && !loadingTargetCount ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin text-pink-500" />
+                      <Loader2 className="w-4 h-4 animate-spin text-pink-400" />
                       <span>Loading Next Page...</span>
                     </>
                   ) : (
                     <>
-                      <Grid className="w-4 h-4 text-pink-500" />
+                      <Grid className="w-4 h-4 text-pink-400" />
                       <span>Load Next Batch</span>
                     </>
                   )}
@@ -1390,11 +1437,11 @@ export function Home() {
       >
         <div className="flex items-center justify-between mb-4 px-1 text-left">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-pink-500" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-pink-400" />
               <span>Processed Video Library</span>
             </h3>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Your recently analyzed TikTok videos. Download high quality without watermark instantly.
             </p>
           </div>
@@ -1404,7 +1451,7 @@ export function Home() {
                 setProcessedVideos([]);
                 localStorage.removeItem('processed_tiktok_videos');
               }}
-              className="text-xs font-semibold text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors cursor-pointer"
+              className="text-xs font-semibold text-slate-500 hover:text-red-400 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Clear History</span>
@@ -1414,12 +1461,12 @@ export function Home() {
 
         {processedVideos.length === 0 ? (
           /* Elegant Placeholder Area */
-          <div className="border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center bg-gray-50/50 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-2xl bg-pink-50 flex items-center justify-center mb-4 text-pink-500 shadow-sm border border-pink-100">
+          <div className="border-2 border-dashed border-slate-700/50 rounded-3xl p-10 text-center bg-slate-800/30 backdrop-blur-sm flex flex-col items-center justify-center shadow-lg">
+            <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mb-4 text-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.15)] border border-pink-500/20">
               <Video className="w-8 h-8" />
             </div>
-            <p className="text-sm font-bold text-gray-700">No processed videos yet</p>
-            <p className="text-xs text-gray-400 mt-1 max-w-sm">
+            <p className="text-sm font-bold text-slate-300">No processed videos yet</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm">
               Once you process a valid TikTok URL using the downloader, the video thumbnail, title, and high quality MP4 links will appear here.
             </p>
           </div>
@@ -1429,19 +1476,21 @@ export function Home() {
             {processedVideos.map((video) => (
               <div 
                 key={video.id} 
-                className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-all group"
+                className="bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden shadow-lg flex flex-col hover:shadow-xl hover:border-slate-500 transition-all group"
               >
-                <div className="relative aspect-[3/4] bg-gray-50 overflow-hidden">
+                <div className="relative aspect-[3/4] bg-slate-900 overflow-hidden">
                   <img 
                     src={video.cover} 
                     alt={video.title || "TikTok cover"} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
                   />
                   
                   {/* Live Download Queue Status Overlay */}
                   {downloadStatus[video.id] && (
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center z-20 animate-fade-in text-white pointer-events-none">
+                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-2 text-center z-20 animate-fade-in text-white pointer-events-none">
                       {downloadStatus[video.id] === 'pending' && (
                         <div className="flex flex-col items-center gap-1">
                           <Clock className="w-4 h-4 text-gray-400 animate-pulse" />
@@ -1451,15 +1500,15 @@ export function Home() {
                       {downloadStatus[video.id] === 'downloading' && (
                         <div className="flex flex-col items-center gap-1.5 w-full px-2">
                           <Loader2 className="w-5 h-5 text-pink-500 animate-spin" />
-                          <div className="w-full bg-white/20 h-1 rounded-full overflow-hidden mt-0.5">
-                            <div className="bg-pink-500 h-full transition-all" style={{ width: `${downloadProgress[video.id] || 0}%` }}></div>
+                          <div className="w-full bg-slate-700/50 h-1 rounded-full overflow-hidden mt-0.5">
+                            <div className="bg-gradient-to-r from-pink-500 to-cyan-500 h-full transition-all" style={{ width: `${downloadProgress[video.id] || 0}%` }}></div>
                           </div>
                           <span className="text-[9px] font-mono font-bold">{downloadProgress[video.id] || 0}%</span>
                         </div>
                       )}
                       {downloadStatus[video.id] === 'completed' && (
                         <div className="flex flex-col items-center gap-1">
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          <CheckCircle2 className="w-5 h-5 text-green-400 shadow-green-500/50 drop-shadow-lg" />
                           <span className="text-[9px] font-bold uppercase tracking-wider text-green-400">Done</span>
                         </div>
                       )}
@@ -1472,10 +1521,10 @@ export function Home() {
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button
                       onClick={() => setVideoData(video)}
-                      className="px-3 py-1.5 bg-white rounded-xl text-xs font-bold text-gray-900 shadow hover:bg-gray-100 transition-all cursor-pointer"
+                      className="px-3 py-1.5 bg-slate-800 rounded-xl text-xs font-bold text-white shadow-lg border border-slate-600 hover:bg-slate-700 transition-all cursor-pointer"
                       title="Preview details"
                     >
                       Inspect
@@ -1483,18 +1532,18 @@ export function Home() {
                   </div>
                 </div>
                 <div className="p-3 text-left flex flex-col justify-between flex-grow gap-2">
-                  <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-relaxed">
+                  <p className="text-xs font-semibold text-slate-300 line-clamp-2 leading-relaxed">
                     {video.title || "No Title"}
                   </p>
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-50">
-                    <span className="text-[10px] font-mono text-gray-400">@{video.author.unique_id}</span>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
+                    <span className="text-[10px] font-mono text-slate-400">@{video.author.unique_id}</span>
                     <button
                       onClick={() => {
                         const cleanTitle = (video.title || '').replace(/[^a-zA-Z0-9_\-]/g, '_').slice(0, 30);
                         const filename = `tiktok_hd_${video.id}${cleanTitle ? '_' + cleanTitle : ''}.mp4`;
                         downloadSingleVideoWithProgress(video.hdplay || video.play, filename, video.id);
                       }}
-                      className="p-1.5 text-pink-500 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors cursor-pointer"
+                      className="p-1.5 text-pink-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors cursor-pointer border border-slate-700/50"
                       title="Download HQ Video"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1512,32 +1561,32 @@ export function Home() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-12 bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden max-w-4xl mx-auto"
+          className="mt-12 bg-slate-800/80 backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl overflow-hidden max-w-4xl mx-auto"
         >
           {videoData.images && videoData.images.length > 0 ? (
             /* Slideshow / Photo Gallery Layout */
             <div className="p-6 md:p-8">
               {/* Header Details */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100 mb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-700/50 mb-6">
                 <div className="flex items-center gap-3">
-                  <img src={videoData.author.avatar} alt={videoData.author.nickname} className="w-12 h-12 rounded-full border border-gray-200 shadow-sm" />
+                  <img src={videoData.author.avatar} alt={videoData.author.nickname} className="w-12 h-12 rounded-full border-2 border-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.3)] object-cover" loading="lazy" decoding="async" />
                   <div>
-                    <p className="font-bold text-gray-900">{videoData.author.nickname}</p>
-                    <p className="text-sm text-gray-500">@{videoData.author.unique_id}</p>
+                    <p className="font-bold text-white">{videoData.author.nickname}</p>
+                    <p className="text-sm text-slate-400">@{videoData.author.unique_id}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="bg-pink-50 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-pink-100 uppercase tracking-wider">
+                  <span className="bg-pink-500/10 text-pink-400 text-xs font-bold px-3 py-1.5 rounded-full border border-pink-500/20 uppercase tracking-wider shadow-sm">
                     📸 Photo Slideshow
                   </span>
-                  <span className="bg-cyan-50 text-cyan-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-cyan-100 uppercase tracking-wider">
+                  <span className="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-3 py-1.5 rounded-full border border-cyan-500/20 uppercase tracking-wider shadow-sm">
                     {videoData.images.length} Photos
                   </span>
                 </div>
               </div>
 
               {/* Title & Caption */}
-              <h3 className="text-xl font-semibold text-gray-800 mb-6 leading-snug">
+              <h3 className="text-xl font-bold text-white mb-6 leading-snug drop-shadow-sm">
                 {videoData.title || 'No Title'}
               </h3>
 
@@ -1560,7 +1609,7 @@ export function Home() {
                       await new Promise((resolve) => setTimeout(resolve, 300));
                     }
                   }}
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold rounded-2xl hover:opacity-95 shadow-md transition-all text-sm"
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-400 hover:to-cyan-400 text-white font-bold rounded-2xl shadow-lg shadow-pink-500/20 transition-all text-sm cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
                   <span>Download All Photos ({videoData.images.length})</span>
@@ -1568,11 +1617,46 @@ export function Home() {
 
                 <a 
                   href={`/api/download?url=${encodeURIComponent(videoData.music)}&filename=${encodeURIComponent(`tiktok_audio_${videoData.id}.mp3`)}`}
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold rounded-2xl border border-gray-200 shadow-sm transition-all text-sm"
+                  onClick={() => trackDownload()}
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-900/60 hover:bg-slate-700/80 text-white font-bold rounded-2xl border border-slate-700 shadow-sm transition-all text-sm cursor-pointer backdrop-blur-md"
                 >
-                  <Music className="w-5 h-5 text-pink-500" />
+                  <Music className="w-5 h-5 text-pink-400" />
                   <span>Download Slideshow Audio (MP3)</span>
                 </a>
+              </div>
+              
+              <div className="flex gap-4 mb-8">
+                <button
+                  onClick={() => {
+                    const dlUrl = `${window.location.origin}/api/download?url=${encodeURIComponent(videoData.images?.[0] || '')}&filename=tiktok_photo_1.jpg`;
+                    navigator.clipboard.writeText(dlUrl);
+                    setCopiedUrl(dlUrl);
+                    setTimeout(() => setCopiedUrl(null), 2000);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-slate-900/40 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-slate-700/50 transition-colors text-sm shadow-sm cursor-pointer"
+                >
+                  {copiedUrl ? <Check className="w-4 h-4 text-green-400" /> : <Link className="w-4 h-4" />}
+                  <span>{copiedUrl ? 'Copied!' : 'Copy Link'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: videoData.title || 'TikTok Slideshow',
+                        text: 'Check out this TikTok slideshow!',
+                        url: window.location.href,
+                      }).catch(console.error);
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      setCopiedUrl('share');
+                      setTimeout(() => setCopiedUrl(null), 2000);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900/40 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-slate-700/50 transition-colors text-sm shadow-sm cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
               </div>
 
               {/* Photos Grid */}
@@ -1583,24 +1667,26 @@ export function Home() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.05 }}
                     key={index}
-                    className="group relative bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col"
+                    className="group relative bg-slate-800/80 backdrop-blur-md rounded-2xl overflow-hidden border border-slate-700/50 shadow-lg hover:shadow-xl hover:border-slate-500 transition-all flex flex-col"
                   >
-                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-gray-100">
+                    <div className="relative aspect-[4/5] w-full overflow-hidden bg-slate-900">
                       <img 
                         src={imgUrl} 
                         alt={`Slideshow item ${index + 1}`} 
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
                       />
                       {/* Image Number Badge */}
-                      <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10">
+                      <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-sm text-white text-xs font-bold px-2.5 py-1 rounded-full border border-white/10 shadow-lg">
                         #{index + 1}
                       </div>
                       {/* Overlay Action */}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                         <a
                           href={`/api/download?url=${encodeURIComponent(imgUrl)}&filename=${encodeURIComponent(`tiktok_photo_${videoData.id}_${index + 1}.jpg`)}`}
-                          className="px-4 py-2.5 bg-white text-gray-900 font-semibold rounded-xl text-xs hover:bg-gray-100 transition-colors shadow-lg flex items-center gap-1.5"
+                          className="px-4 py-2.5 bg-gradient-to-r from-pink-500 to-cyan-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-pink-500/20 hover:from-pink-400 hover:to-cyan-400 transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Download Original
@@ -1609,10 +1695,11 @@ export function Home() {
                     </div>
                     
                     {/* Explicitly visible download button and footer */}
-                    <div className="p-3 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between gap-2 mt-auto">
-                      <span className="text-xs font-semibold text-gray-500">Photo {index + 1}</span>
+                    <div className="p-3 bg-slate-900/60 border-t border-slate-700/50 flex items-center justify-between gap-2 mt-auto">
+                      <span className="text-xs font-bold text-slate-400">Photo {index + 1}</span>
                       <a
                         href={`/api/download?url=${encodeURIComponent(imgUrl)}&filename=${encodeURIComponent(`tiktok_photo_${videoData.id}_${index + 1}.jpg`)}`}
+                        onClick={() => trackDownload()}
                         className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-xl shadow-sm hover:opacity-90 transition-opacity"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -1625,15 +1712,17 @@ export function Home() {
             </div>
           ) : (
             /* Traditional Single Video Layout */
-            <div className="flex flex-col md:flex-row">
+            <div className="flex flex-col md:flex-row bg-slate-800/80 backdrop-blur-md">
               {/* Visuals */}
-              <div className="md:w-1/3 relative bg-gray-50">
+              <div className="md:w-1/3 relative bg-slate-900 border-r border-slate-700/50">
                 <img 
                   src={videoData.cover} 
                   alt={videoData.title} 
                   className="w-full h-full object-cover max-h-80 md:max-h-full"
+                  loading="lazy"
+                  decoding="async"
                 />
-                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded border border-white/10 font-mono">
+                <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-sm text-white text-xs px-2 py-1 rounded border border-white/10 font-mono shadow-lg">
                   {videoData.duration}s
                 </div>
               </div>
@@ -1642,13 +1731,13 @@ export function Home() {
               <div className="p-6 md:p-8 md:w-2/3 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-4">
-                    <img src={videoData.author.avatar} alt={videoData.author.nickname} className="w-10 h-10 rounded-full border border-gray-200" />
+                    <img src={videoData.author.avatar} alt={videoData.author.nickname} className="w-10 h-10 rounded-full border-2 border-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.3)]" loading="lazy" decoding="async" />
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{videoData.author.nickname}</p>
-                      <p className="text-xs text-gray-500">@{videoData.author.unique_id}</p>
+                      <p className="text-sm font-bold text-white">{videoData.author.nickname}</p>
+                      <p className="text-xs text-slate-400">@{videoData.author.unique_id}</p>
                     </div>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-800 line-clamp-3 leading-snug mb-6">
+                  <h3 className="text-lg font-bold text-slate-200 line-clamp-3 leading-snug mb-6 drop-shadow-sm">
                     {videoData.title || 'No title'}
                   </h3>
                 </div>
@@ -1656,41 +1745,78 @@ export function Home() {
                 <div className="space-y-3">
                   <a 
                     href={`/api/download?url=${encodeURIComponent(videoData.hdplay || videoData.play)}&filename=${encodeURIComponent(`tiktok_video_hd_${videoData.id}.mp4`)}`}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-medium rounded-xl border border-cyan-200 transition-colors"
+                    onClick={() => trackDownload()}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-400 hover:to-cyan-400 text-white font-bold rounded-xl shadow-lg shadow-pink-500/20 transition-all cursor-pointer border border-transparent"
                   >
                     <div className="flex items-center gap-2">
-                      <Video className="w-5 h-5 text-cyan-600" />
+                      <Video className="w-5 h-5 text-white" />
                       <span>Download MP4 (HD)</span>
                     </div>
-                    <span className="text-xs bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded uppercase tracking-wider font-bold">No Watermark</span>
+                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded uppercase tracking-wider font-bold shadow-sm backdrop-blur-sm border border-white/10">No Watermark</span>
                   </a>
 
                   <a 
                     href={`/api/download?url=${encodeURIComponent(videoData.wmplay)}&filename=${encodeURIComponent(`tiktok_video_sd_${videoData.id}.mp4`)}`}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-xl border border-gray-200 transition-colors"
+                    onClick={() => trackDownload()}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/60 hover:bg-slate-700/80 text-slate-300 font-bold rounded-xl border border-slate-700 shadow-sm transition-all cursor-pointer backdrop-blur-md"
                   >
                     <div className="flex items-center gap-2">
-                      <Video className="w-5 h-5 text-gray-500" />
+                      <Video className="w-5 h-5 text-slate-400" />
                       <span>Download MP4 (SD)</span>
                     </div>
-                    <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Watermarked</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Watermarked</span>
                   </a>
 
                   <div className="grid grid-cols-2 gap-3 mt-2">
                     <a 
                       href={`/api/download?url=${encodeURIComponent(videoData.music)}&filename=${encodeURIComponent(`tiktok_audio_${videoData.id}.mp3`)}`}
-                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-xl border border-gray-200 transition-colors text-sm"
+                      onClick={() => trackDownload()}
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-600 transition-colors text-sm shadow-sm cursor-pointer"
                     >
-                      <Music className="w-4 h-4" />
+                      <Music className="w-4 h-4 text-pink-400" />
                       <span>Audio MP3</span>
                     </a>
                     <a 
                       href={`/api/download?url=${encodeURIComponent(videoData.cover)}&filename=${encodeURIComponent(`tiktok_thumbnail_${videoData.id}.jpg`)}`}
-                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-xl border border-gray-200 transition-colors text-sm"
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-600 transition-colors text-sm shadow-sm cursor-pointer"
                     >
-                      <ImageIcon className="w-4 h-4" />
+                      <ImageIcon className="w-4 h-4 text-cyan-400" />
                       <span>Thumbnail</span>
                     </a>
+                  </div>
+
+                  <div className="flex gap-3 mt-2">
+                    <button
+                      onClick={() => {
+                        const dlUrl = `${window.location.origin}/api/download?url=${encodeURIComponent(videoData.hdplay || videoData.play)}&filename=${encodeURIComponent(`tiktok_video_hd_${videoData.id}.mp4`)}`;
+                        navigator.clipboard.writeText(dlUrl);
+                        setCopiedUrl(dlUrl);
+                        setTimeout(() => setCopiedUrl(null), 2000);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-bold rounded-xl border border-slate-700 transition-colors text-sm shadow-sm cursor-pointer"
+                    >
+                      {copiedUrl ? <Check className="w-4 h-4 text-green-400" /> : <Link className="w-4 h-4" />}
+                      <span>{copiedUrl ? 'Link Copied!' : 'Copy DL Link'}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (navigator.share) {
+                          navigator.share({
+                            title: videoData.title || 'TikTok Video',
+                            text: 'Check out this TikTok video!',
+                            url: videoData.play || window.location.href,
+                          }).catch(console.error);
+                        } else {
+                          navigator.clipboard.writeText(videoData.play || window.location.href);
+                          setCopiedUrl('share');
+                          setTimeout(() => setCopiedUrl(null), 2000);
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/60 hover:bg-slate-800 text-slate-400 hover:text-slate-200 font-bold rounded-xl border border-slate-700 transition-colors text-sm shadow-sm cursor-pointer"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1705,21 +1831,25 @@ export function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="mt-16 text-center"
+          className="mt-16 text-center pb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-pink-50 text-pink-700 rounded-full text-sm font-medium border border-pink-100 mb-6">
-            <Star className="w-4 h-4" /> Go Premium
+          <div className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-pink-500/10 to-cyan-500/10 text-transparent bg-clip-text rounded-full text-sm font-bold border border-pink-500/20 mb-8 backdrop-blur-md shadow-lg shadow-pink-500/5">
+            <Star className="w-4 h-4 text-pink-400" /> <span className="bg-gradient-to-r from-pink-400 to-cyan-400 bg-clip-text">Premium TikTok Downloader Features</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-4">
             {[
-              { title: 'No Ads', desc: 'Enjoy a completely ad-free experience.' },
-              { title: 'Faster Queue', desc: 'Prioritized download lane for premium members.' },
-              { title: 'Batch Downloads', desc: 'Download entire TikTok profiles at once.' }
+              { title: 'Zero Ads Experience', desc: 'Enjoy a completely ad-free download experience with no annoying popups.', icon: <CheckCircle2 className="w-6 h-6 text-pink-400" /> },
+              { title: 'Ultra-Fast Speeds', desc: 'Prioritized download lane utilizing high-bandwidth proxy servers.', icon: <Video className="w-6 h-6 text-cyan-400" /> },
+              { title: 'Bulk Profile Save', desc: 'Download entire TikTok profiles at once seamlessly via ZIP archives.', icon: <User className="w-6 h-6 text-pink-400" /> }
             ].map((feature, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-left flex flex-col gap-2">
-                <CheckCircle2 className="w-6 h-6 text-pink-500" />
-                <h4 className="font-semibold text-gray-900">{feature.title}</h4>
-                <p className="text-sm text-gray-500">{feature.desc}</p>
+              <div key={idx} className="bg-slate-800/40 backdrop-blur-xl p-8 rounded-3xl border border-slate-700/50 shadow-2xl text-left flex flex-col gap-4 hover:border-pink-500/30 hover:shadow-pink-500/10 transition-all group">
+                <div className="w-12 h-12 rounded-2xl bg-slate-900/80 border border-slate-700 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  {feature.icon}
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-white text-lg mb-1">{feature.title}</h4>
+                  <p className="text-sm text-slate-400 leading-relaxed font-medium">{feature.desc}</p>
+                </div>
               </div>
             ))}
           </div>

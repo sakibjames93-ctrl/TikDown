@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'info.sakibjames@gmail.com' && request.auth.token.email_verified == true;
+    }
+    
+    function isValidSettings(data) {
+      return data.keys().hasAll(['websiteName', 'maintenanceMode']) 
+        && data.websiteName is string && data.websiteName.size() <= 200
+        && data.maintenanceMode is bool
+        && (notHas(data, 'apiBaseUrl') || (data.apiBaseUrl is string && data.apiBaseUrl.size() <= 1000))
+        && (notHas(data, 'adsCodeHead') || (data.adsCodeHead is string && data.adsCodeHead.size() <= 5000))
+        && (notHas(data, 'adsCodeBody') || (data.adsCodeBody is string && data.adsCodeBody.size() <= 5000))
+        && (notHas(data, 'seoTitle') || (data.seoTitle is string && data.seoTitle.size() <= 500))
+        && (notHas(data, 'seoDescription') || (data.seoDescription is string && data.seoDescription.size() <= 2000));
+    }
+    
+    function notHas(data, field) {
+      return !(field in data);
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidSettings(incoming());
+      allow update: if isAdmin() && isValidSettings(incoming());
+      allow delete: if isAdmin();
+    }
+
+    function isValidStats(data) {
+      return data.keys().hasAll(['totalDownloads', 'date'])
+        && data.totalDownloads is number
+        && data.date is string && data.date.size() <= 20;
+    }
+
+    match /stats/{dateId} {
+      allow read: if isAdmin();
+      allow create: if isValidStats(incoming());
+      allow update: if isValidStats(incoming()) && incoming().date == existing().date;
+    }
+  }
+}
