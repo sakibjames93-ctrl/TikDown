@@ -27,14 +27,17 @@ function formatTikwmUrls(obj: any) {
 
 async function startServer() {
   const app = express();
+  app.set("trust proxy", 1);
   // On Hostinger, you must change this line to: const PORT = process.env.PORT || 3000;
   // (AI Studio requires port 3000 to be hardcoded during development)
   const PORT = 3000;
 
   // Security Middleware
   app.use(helmet({
-    contentSecurityPolicy: false, // Allow Vite inline scripts and external images
+    contentSecurityPolicy: false, 
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
   }));
 
   // CORS Configuration
@@ -54,7 +57,8 @@ async function startServer() {
     max: 100, // Limit each IP to 100 requests per window
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Too many requests from this IP, please try again after 15 minutes." }
+    message: { error: "Too many requests from this IP, please try again after 15 minutes." },
+    validate: { xForwardedForHeader: false }
   });
 
   app.use("/api/", apiLimiter);
